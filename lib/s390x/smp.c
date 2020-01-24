@@ -49,6 +49,14 @@ struct cpu *smp_cpu_from_addr(uint16_t addr)
 	return NULL;
 }
 
+void smp_cpu_wait_for_completion(uint16_t addr)
+{
+	uint32_t status;
+
+	/* Loops when cc == 2, i.e. when the cpu is busy with a sigp order */
+	sigp_retry(1, SIGP_SENSE, 0, &status);
+}
+
 bool smp_cpu_stopped(uint16_t addr)
 {
 	uint32_t status;
@@ -100,6 +108,7 @@ int smp_cpu_stop_store_status(uint16_t addr)
 
 	spin_lock(&lock);
 	rc = smp_cpu_stop_nolock(addr, true);
+	smp_cpu_wait_for_completion(addr);
 	spin_unlock(&lock);
 	return rc;
 }

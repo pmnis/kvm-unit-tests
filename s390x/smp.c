@@ -103,7 +103,12 @@ static void test_stop_store_status(void)
 	lc->prefix_sa = 0;
 	lc->grs_sa[15] = 0;
 	smp_cpu_stop_store_status(1);
-	mb();
+	/*
+	 * This loop is workaround for KVM not reporting cc 2 for SIGP
+	 * sense if a stop and store status is pending.
+	 */
+	while (!lc->prefix_sa)
+		mb();
 	report(lc->prefix_sa == (uint32_t)(uintptr_t)cpu->lowcore, "prefix");
 	report(lc->grs_sa[15], "stack");
 	report(smp_cpu_stopped(1), "cpu stopped");
@@ -113,7 +118,8 @@ static void test_stop_store_status(void)
 	lc->prefix_sa = 0;
 	lc->grs_sa[15] = 0;
 	smp_cpu_stop_store_status(1);
-	mb();
+	while (!lc->prefix_sa)
+		mb();
 	report(lc->prefix_sa == (uint32_t)(uintptr_t)cpu->lowcore, "prefix");
 	report(lc->grs_sa[15], "stack");
 	report_prefix_pop();
@@ -256,7 +262,7 @@ static void test_reset_initial(void)
 	wait_for_flag();
 
 	sigp_retry(1, SIGP_INITIAL_CPU_RESET, 0, NULL);
-	sigp(1, SIGP_STORE_STATUS_AT_ADDRESS, (uintptr_t)status, NULL);
+	sigp_retry(1, SIGP_STORE_STATUS_AT_ADDRESS, (uintptr_t)status, NULL);
 
 	report_prefix_push("clear");
 	report(!status->psw.mask && !status->psw.addr, "psw");
@@ -306,6 +312,7 @@ static void test_reset(void)
 	smp_cpu_start(1, psw);
 
 	sigp_retry(1, SIGP_CPU_RESET, 0, NULL);
+	while (!smp_cpu_stopped(1)) {}
 	report(smp_cpu_stopped(1), "cpu stopped");
 
 	set_flag(0);
