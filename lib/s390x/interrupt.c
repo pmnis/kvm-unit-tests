@@ -16,6 +16,7 @@
 
 static bool pgm_int_expected;
 static bool ext_int_expected;
+static void (*pgm_int_func)(void);
 static struct lowcore *lc;
 
 void expect_pgm_int(void)
@@ -51,8 +52,16 @@ void check_pgm_int_code(uint16_t code)
 	       lc->pgm_int_code);
 }
 
+void register_pgm_int_func(void (*f)(void))
+{
+	pgm_int_func = f;
+}
+
 static void fixup_pgm_int(void)
 {
+	if (pgm_int_func)
+		return (*pgm_int_func)();
+
 	switch (lc->pgm_int_code) {
 	case PGM_INT_CODE_PRIVILEGED_OPERATION:
 		/* Normal operation is in supervisor state, so this exception
